@@ -1,2 +1,5 @@
 *.yml
-unittest.log
+nunittest.log
+tests/__pycache__
+zflux/__pycache__
+*.log

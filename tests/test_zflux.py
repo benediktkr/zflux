@@ -1,5 +1,5 @@
 import threading
-from time import sleep
+from time import sleep, time
 
 import random
 
@@ -11,116 +11,220 @@ from zflux.zflux import Zflux
 from zflux.config import Config
 from zflux.stresstester import StressTester
 
-conf = Config.read('test-zflux-proxy.yml')
-logger.remove()
 logger.add("unittest.log")
 logger.info("-----")
-logger.info(conf)
-
 
 class StopTestingMe(Exception): pass
 
 
 class Zflux2(Zflux):
+    def __init__(self, topic, count, *args, **kwargs):
+
+        self.fake_influxdb_errors = kwargs.pop('fake_influxdb_errors', True)
+        if not self.fake_influxdb_errors:
+            logger.warning("no influxdb errors simulated")
+        self.last_i = None
+        self.missed = 0
+        self.count = count
+        super().__init__(topic, *args, **kwargs)
+
     def influxdb_write(self, msgs):
-        if len(msgs) > self.batch:
+
+        assert len(msgs) > 0
+
+        temp_last = self.last_i
+        for msg in msgs:
+            val = msg['fields']['value']
+            if temp_last is not None:
+                diff = val - temp_last
+                assert diff == 1, diff
+                temp_last = val
+
+            else:
+                logger.warning(f"start: {val}")
+                temp_last = val
+
+        self.last_i = temp_last
+        if self.last_i >= self.count:
+            raise StopTestingMe
+
+
+    def influxdb_write2(self, msgs):
+        if len(msgs) > self.batch or len(msgs) == 0:
             raise ValueError("just send one chunk")
 
-
         last_val = self.last_i
-        if last_val == 0:
+        if last_val is None:
             next_ = msgs[0]['fields']['value']
-            if next_ == 0:
-                self.missed = next_ - len(msgs)
-            else:
-                last_val = next_ - 1
+            if next_ != 0:
+                self.missed = next_
+                logger.warning(f"start: {self.missed}")
+            last_val = next_-1
 
         for msg in msgs:
             val = msg['fields']['value']
             diff = val - last_val
 
-            if diff != 1:
-                raise ValueError(val, last_val)
+            assert val > last_val, f"new value sould be larger, {val}>{last_val}"
+            assert diff == 1, f"{diff} == 1, val: {val}, last_val: {last_val}"
 
-            if random.randint(0, 100) < random.randint(0, 15):
-                raise RequestException("simulating errors")
+            # if diff == 0 and last_val == 0:
+            #     # starting from 0 is a speial case
+            #     pass
+            if self.fake_influxdb_errors:
+                if random.randint(0, 100) < random.randint(0, 10):
+                    raise RequestException("simulating errors")
+
+            # if val % 1000 == 0:
+            #     logger.info(f"{val}/{self.count}")
             last_val = val
 
-
-        self.total_writes += len(msgs)
+        if last_val >= self.count:
+            logger.info(f"got {val}/{self.count} messags in order")
+            raise StopTestingMe
 
         self.last_i = last_val
-        if self.target_count < self.last_i:
-
-            extra = self.last_i - self.target_count
-            if extra > len(msgs):
-                raise ValueError("should not happen")
-            self.total = self.last_i - extra
-            assert self.total == self.target_count
-
-
-
-            raise StopTestingMe(self.last_i)
 
         return True
 
 
-def zflux_sub():
-    z = Zflux2(conf.zmq.topic)
+class Job(threading.Thread):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-    z.last_i = 0
-    z.target_count=random.randint(2000, 30000)
-    z.missed = 0
-    z.total_writes = 0
+        self.shutdown_flag = threading.Event()
 
-    if conf.zmq.connect:
-        z.connect(conf.zmq.connect)
-    else:
-        z.bind(conf.zmq.bind)
+    def stop(self):
+        assert self.is_alive()
+        self.shutdown_flag.set()
 
-    logger.info("target: " + str(z.target_count))
-    logger.remove()
-    try:
+        while self.is_alive():
+            sleep(0.1)
 
-        z.run()
-    except StopTestingMe:
-        logger.add("unittest.log")
+        logger.info("thread stopped")
+        return True
 
-        logger.info("missed: " + str(z.missed))
-
-        logger.info("done")
-        return
+    def wait(self):
+        while not self.shutdown_flag.is_set():
+            sleep(1.0)
 
 
-def stress_pub():
-    s = StressTester("count", topic=conf.zmq.topic, sleepfract=1000)
-    s.connect(conf.zmq.pub)
-    sleep(3)
+class ZfluxJob(Job):
+    def __init__(self, conf, count, *args, **kwargs):
+        super().__init__()
+
+        self.conf = conf
+        self.count = count
+        self.zflux = Zflux2(conf.zmq.topic, count, **kwargs)
+
+        self.zflux.socket.set_hwm(0)
 
 
-    s.run()
+        if conf.zmq.connect:
+            logger.debug(f"connectig to {conf.zmq.connect}")
+            self.zflux.connect(conf.zmq.connect)
+        else:
+            logger.debug(f"binding on {conf.zmq.bind}")
+            self.zflux.bind(conf.zmq.bind)
 
-def test_proxy_counting():
+        logger.info(f"expecting {count} messages")
 
-    try:
-        zflux_thread = threading.Thread(target=zflux_sub)
-        zflux_thread.daemon = True
-        stress_thread = threading.Thread(target=stress_pub)
-        stress_thread.daemon = True
+    def run(self):
+        try:
+            self.zflux.run()
+        except StopTestingMe:
 
-        zflux_thread.start()
-        stress_thread.start()
+            return True
+        except Exception:
+            raise
 
-        zflux_thread.join()
+class StressJob(Job):
+    def __init__(self, conf, count, *args, **kwargs):
 
-    except StopTestingMe:
-        logger.info("got signal to stop testing")
-        stress_thread.stop()
-        zflux_thread.stop()
+        self.conf = conf
+        self.count = count
+        self.stress = StressTester("count", topic=conf.zmq.topic)
+        self.stress.socket.setsockopt(zmq.LINGER, -1)
+        super().__init__()
+
+        logger.info(f"stressing to {conf.zmq.pub}")
+        self.stress.connect(conf.zmq.pub)
+
+        sleep(1.0)
+
+    def run(self):
+        #c = self.stress.run()
+        #assert c == self.count, f"{c} == {self.count}"
+
+        i = 0
+        while not self.shutdown_flag.is_set():
+            i+=1
+            self.stress.send(i)
+        logger.info(f"sent {i} messages")
+
+        return i
+
+
+def test_counting_proxy():
+    conf = Config.read('test-zflux-proxy.yml')
+    count = random.randint(3000, 5000)
+
+    run_test_threads(conf, count)
+
+def test_counting_local_defaults():
+    conf = Config.read('test-zflux-local.yml')
+    count = random.randint(3000, 5000)
+
+    run_test_threads(conf, count)
+
+def test_counting_local_noerrors():
+    conf = Config.read('test-zflux-local.yml')
+    count = random.randint(3000, 5000)
+
+    run_test_threads(conf, count, fake_influxdb_errors=False)
+
+def test_counting_proxy_noerrors():
+    conf = Config.read('test-zflux-proxy.yml')
+    count = random.randint(3000, 5000)
+
+    run_test_threads(conf, count, fake_influxdb_errors=False)
+
+def test_counting_proxy_1sec():
+    conf = Config.read('test-zflux-proxy.yml')
+    count = random.randint(3000, 5000)
+
+    run_test_threads(conf, count, poll_secs=1.0)
+
+def test_counting_proxy2():
+    conf = Config.read('test-zflux-proxy.yml')
+    count = random.randint(3000, 5000)
+
+    run_test_threads(conf, count, max_age=1.0, batch=100, poll_secs=1.0)
+
+
+def run_test_threads(conf, count, **kwargs):
+    zflux_thread = ZfluxJob(conf, count, **kwargs)
+    zflux_thread.start()
+
+    sleep(2)
+
+    stress_thread = StressJob(conf, count)
+    stress_thread.start()
+
+    zflux_thread.join(timeout=120)
+    assert (not zflux_thread.is_alive()), "sub thread still alive"
+
+    stress_thread.stop()
+    assert not stress_thread.is_alive()
+
+    logger.info("finished")
+    return True
 
 
 def main():
-    test_proxy_counting()
+
+    test_counting_proxy()
+
 
 def test_zflux_version():
     from zflux import __version__

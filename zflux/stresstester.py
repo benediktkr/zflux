@@ -20,6 +20,8 @@ class StressTester(object):
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.PUB)
 
+        self.i = 0
+
     def connect(self, addr):
         self.addr = addr
         self.socket.connect(addr)
@@ -27,7 +29,7 @@ class StressTester(object):
     def __del__(self):
         self.socket.close()
         self.context.destroy()
-        logger.info("closed socket and destroyed context")
+        logger.debug("closed socket and destroyed context")
 
     def mkmsg(self, value):
         return {"tags": {"test": "yes"},
@@ -35,33 +37,32 @@ class StressTester(object):
                 "measurement": "rand",
                 "time": datetime.now().isoformat()}
 
-    def handle(self):
+    def send(self, i):
+
+        if self.mode == "count":
+            value = i
+        else:
+            value = random.randint(0, 100)
+
+        msg = self.mkmsg(value)
+
+        bytemsg = [self.topic, json.dumps(msg).encode()]
+        self.socket.send_multipart(bytemsg)
+
+        if self.verbose:
+            logger.debug(bytemsg)
+
+        if self.sleepfract and random.randint(0, 10) == 0:
+            sleep(0.002)
+
+
+    def run(self, max_=None):
         i = 0
-        while True:
-            for _ in range(self.batch):
-                i += 1
+        while i < max_ or max_ is None:
+            i+=1
+            self.send(i)
+        return i
 
-                if self.mode == "count":
-                    value = i
-                else:
-                    value = random.randint(0, 100)
-
-                msg = self.mkmsg(value)
-
-                bytemsg = [self.topic, json.dumps(msg).encode()]
-                self.socket.send_multipart(bytemsg)
-
-                if self.verbose:
-                    logger.debug(bytemsg)
-
-            sleep(random.randint(0, 10)/10./self.sleepfract)
-
-    def run(self):
-        try:
-            while True:
-                self.handle()
-        except KeyboardInterrupt:
-            self.destroy()
 
 def main():
     import zflux.config

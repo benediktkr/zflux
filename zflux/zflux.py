@@ -72,13 +72,12 @@ class Zflux(object):
         if len(msgs) > self.batch:
             raise ValueError("just send one chunk")
 
-        #write = self.influxdb_client.write_points(
-        #    msgs,
-        #    time_precision=self.preicision,
-        #    batch_size=self.batch)
-        write = True
+        write = self.influxdb_client.write_points(
+            msgs,
+            time_precision=self.preicision,
+            batch_size=self.batch)
         if not write:
-            raise ValueError("infludb client write returned False")
+            raise ValueError("influxdb client write returned False")
         return len(msgs)
 
 
@@ -103,22 +102,22 @@ class Zflux(object):
 
         now = time()
         count = len(self.buffer)
-        if count > 0 and count > self.batch or self.influx_at+self.max_age < now:
+        if count > 0 and (count > self.batch or self.influx_at+self.max_age < now):
             try:
-                self.influx_at = time()
-
                 while len(self.buffer) > 0:
                     thisbatch = list(islice(self.buffer, self.batch))
                     self.influxdb_write(thisbatch)
+                    self.influx_at = time()
 
                     for _ in thisbatch:
                         self.buffer.popleft()
 
 
             except (gaierror, RequestException, ValueError) as e:
-                if len(self.buffer) > 2*self.batch:
-                    logger.error(f"{e}\nbuffer size: {len(self.buffer)}")
-
+                if e.args[0].startswith("simulating"):
+                    logger.debug(e)
+                else:
+                    logger.error(e)
 
 def main():
     logger.info("started")
