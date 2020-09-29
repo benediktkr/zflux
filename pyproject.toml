@@ -13,9 +13,9 @@ requests = "^2.24.0"
 pyyaml = "^5.3.1"
 
 [tool.poetry.scripts]
-connect = "zflux.zflux:main"
-stress = "zflux.stresstester:main"
-wtf = "zflux.testthis:main"
+zflux = "zflux.zflux:main"
+
+
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

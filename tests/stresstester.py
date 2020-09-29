@@ -10,11 +10,11 @@ from loguru import logger
 
 class StressTester(object):
 
-    def __init__(self, mode, topic=b"test", batch=1, sleepfract=1, verbose=False):
+    def __init__(self, mode, topic=b"test", batch=1, sleep=False, verbose=False):
         self.mode = mode
         self.topic = topic
         self.batch = batch
-        self.sleepfract = sleepfract
+        self.sleep = sleep
         self.verbose = verbose
 
         self.context = zmq.Context()
@@ -32,6 +32,7 @@ class StressTester(object):
         logger.debug("closed socket and destroyed context")
 
     def mkmsg(self, value):
+        return {'fields': {'value': value}}
         return {"tags": {"test": "yes"},
                 "fields": {"value": value },
                 "measurement": "rand",
@@ -52,23 +53,39 @@ class StressTester(object):
         if self.verbose:
             logger.debug(bytemsg)
 
-        if self.sleepfract and random.randint(0, 10) == 0:
+        if self.sleep and random.randint(0, 10) == 0:
             sleep(0.002)
 
 
     def run(self, max_=None):
         i = 0
-        while i < max_ or max_ is None:
+        while max_ is None or i < max_:
             i+=1
             self.send(i)
         return i
 
 
-def main():
+def run_stresser():
     import zflux.config
     conf = zflux.config.Config.read()
     args = zflux.config.args()
 
-    stress = StressTester("count", verbose=args.verbose, sleepfract=100)
+    stress = StressTester("count", verbose=args.verbose, sleep=False)
     stress.connect(conf.zmq.pub)
     stress.run()
+
+def stresssub():
+    from zflux.config import argparser
+    args = argparser().parse_args()
+    conf = Config.read(args.config)
+    zflux = Zflux2(conf.zmq.topic , count=100000, batch=5)
+    #zflux.socket.set_hwm(0)
+
+    if conf.zmq.connect:
+        logger.debug(f"connectig to {conf.zmq.connect}")
+        zflux.connect(conf.zmq.connect)
+    else:
+        logger.debug(f"binding on {conf.zmq.bind}")
+        zflux.bind(conf.zmq.bind)
+
+    zflux.run()

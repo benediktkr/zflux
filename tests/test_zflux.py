@@ -9,7 +9,7 @@ from loguru import logger
 
 from zflux.zflux import Zflux
 from zflux.config import Config
-from zflux.stresstester import StressTester
+from tests.stresstester import StressTester
 
 logger.add("unittest.log")
 logger.info("-----")
@@ -29,20 +29,31 @@ class Zflux2(Zflux):
         super().__init__(topic, *args, **kwargs)
 
     def influxdb_write(self, msgs):
+        #print(f"dealing with: {msgs}")
 
         assert len(msgs) > 0
+        #assert len(msgs) == 1
+
+        #assert len(self.buffer) == 1
 
         temp_last = self.last_i
         for msg in msgs:
             val = msg['fields']['value']
             if temp_last is not None:
                 diff = val - temp_last
-                assert diff == 1, diff
+                assert diff == 1, f"{diff} {temp_last} {val}"
                 temp_last = val
 
             else:
                 logger.warning(f"start: {val}")
                 temp_last = val
+
+            if self.fake_influxdb_errors:
+                if random.randint(0, 1000) < 2:
+                    err = f"simulating errors {self.last_i}/{self.count}"
+                    raise RequestException(err)
+
+
 
         self.last_i = temp_last
         if self.last_i >= self.count:
@@ -143,7 +154,7 @@ class StressJob(Job):
 
         self.conf = conf
         self.count = count
-        self.stress = StressTester("count", topic=conf.zmq.topic)
+        self.stress = StressTester("count", topic=conf.zmq.topic, sleep=False)
         self.stress.socket.setsockopt(zmq.LINGER, -1)
         super().__init__()
 
@@ -165,13 +176,25 @@ class StressJob(Job):
         return i
 
 
-def test_counting_proxy():
-    conf = Config.read('test-zflux-proxy.yml')
-    count = random.randint(3000, 5000)
+# def test_counting_proxy():
+#     conf = Config.read('test-zflux-proxy.yml')
+#     count = random.randint(3000, 5000)
 
-    run_test_threads(conf, count)
+#     run_test_threads(conf, count)
 
-def test_counting_local_defaults():
+# def test_counting_proxy_noerrors():
+#     conf = Config.read('test-zflux-proxy.yml')
+#     count = random.randint(3000, 5000)
+
+#     run_test_threads(conf, count, fake_influxdb_errors=False)
+
+# def test_counting_proxy_1sec():
+#     conf = Config.read('test-zflux-proxy.yml')
+#     count = random.randint(3000, 5000)
+
+#     run_test_threads(conf, count, poll_secs=1.0)
+
+def test_counting_local():
     conf = Config.read('test-zflux-local.yml')
     count = random.randint(3000, 5000)
 
@@ -183,23 +206,6 @@ def test_counting_local_noerrors():
 
     run_test_threads(conf, count, fake_influxdb_errors=False)
 
-def test_counting_proxy_noerrors():
-    conf = Config.read('test-zflux-proxy.yml')
-    count = random.randint(3000, 5000)
-
-    run_test_threads(conf, count, fake_influxdb_errors=False)
-
-def test_counting_proxy_1sec():
-    conf = Config.read('test-zflux-proxy.yml')
-    count = random.randint(3000, 5000)
-
-    run_test_threads(conf, count, poll_secs=1.0)
-
-def test_counting_proxy2():
-    conf = Config.read('test-zflux-proxy.yml')
-    count = random.randint(3000, 5000)
-
-    run_test_threads(conf, count, max_age=1.0, batch=100, poll_secs=1.0)
 
 
 def run_test_threads(conf, count, **kwargs):
@@ -221,11 +227,15 @@ def run_test_threads(conf, count, **kwargs):
     return True
 
 
-def main():
-
-    test_counting_proxy()
-
-
 def test_zflux_version():
     from zflux import __version__
     assert __version__ == '0.1.0'
+
+if __name__ == "__main__":
+    from zflux.config import argparser
+
+    args = argparser().parse_args()
+    conf = Config.read(args.config)
+    count = random.randint(3000, 5000)
+
+    run_test_threads(conf, count)

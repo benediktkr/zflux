@@ -13,6 +13,7 @@ from influxdb import InfluxDBClient
 # exceptions influxdb throws
 from socket import gaierror
 from requests.exceptions import RequestException
+from influxdb.exceptions import InfluxDBServerError
 
 class Zflux(object):
 
@@ -84,40 +85,51 @@ class Zflux(object):
     def run(self):
         try:
             while True:
-                self.handle()
+                self.handle_recv()
+                if len(self.buffer) > 0:
+                    self.handle_buffer()
 
         except KeyboardInterrupt:
             logger.info("exiting")
             raise SystemExit
 
-    def handle(self):
+
+    def handle_recv(self):
         polled = dict(self.poller.poll(timeout=self.poll_secs*1000))
 
-        if self.socket in polled:
+        if self.socket in polled and polled[self.socket] == zmq.POLLIN:
             topic, msg = self.socket.recv_multipart()
             # topic is not used but very probably will be
             jmsg = json.loads(msg.decode())
 
             self.buffer.append(jmsg)
 
+    def handle_buffer(self):
+
         now = time()
         count = len(self.buffer)
-        if count > 0 and (count > self.batch or self.influx_at+self.max_age < now):
+        if now > self.influx_at + self.max_age:
             try:
                 while len(self.buffer) > 0:
                     thisbatch = list(islice(self.buffer, self.batch))
+                    #thisbatch = self.buffer[:1]
                     self.influxdb_write(thisbatch)
                     self.influx_at = time()
 
-                    for _ in thisbatch:
+                    for _ in range(len(thisbatch)):
                         self.buffer.popleft()
-
-
             except (gaierror, RequestException, ValueError) as e:
                 if e.args[0].startswith("simulating"):
                     logger.debug(e)
                 else:
                     logger.error(e)
+                return 0
+            except InfluxDBServerError as e:
+                if e.args[0]['error'] == 'timeout':
+                    # influxdb.exceptions.InfluxDBServerError: {"error":"timeout"}
+                    logger.error(e)
+                else:
+                    raise e
 
 def main():
     logger.info("started")
