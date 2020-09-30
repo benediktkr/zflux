@@ -108,7 +108,7 @@ class Zflux(object):
 
         now = time()
         count = len(self.buffer)
-        if now > self.influx_at + self.max_age:
+        if (now > self.influx_at + self.max_age) or (count > self.batch):
             try:
                 while len(self.buffer) > 0:
                     thisbatch = list(islice(self.buffer, self.batch))
