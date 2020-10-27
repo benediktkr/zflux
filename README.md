@@ -4,16 +4,17 @@ A buffering proxy for InfluxDB, using a zmq SUB socket.
 
 ## Overview
 
-The usecase this was written to improve reliability of InfluxDB,
-especially when the InfluxDB server is on a different network than the
-clients. If the connection goes down, or the server is unreachable,
-the client has to handle the error and buffer datapoints.
+This was written as a way to improve reliability of InfluxDB,
+especially when the InfluxDB server lives on a different network than
+the clients/producers. If the connection between them and the server
+goes down, or the server is otherwise unreachable, the client has to
+handle the error and buffer datapoints.
 
 The purpose of `zflux` is to sit on the same network as the hosts producing
 the data sent to InfluxDB and act as the InfluxDB client. It recieves the
-messages from the producers via its SUB socket. If the IfluxDB client is not
+messages from the producers via its SUB socket. If the IfluxDB client cant be
 reached, the messages get added to the buffer which is then emptied when
-the server is responsive again.
+the server is reachable.
 
 It supports both using `connect()` and `bind()`, but if both are defined it will default to using `connect()`.
 
