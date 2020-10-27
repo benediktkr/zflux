@@ -4,10 +4,10 @@ A buffering proxy for InfluxDB, using a zmq SUB socket.
 
 ## Overview
 
-The usecase this was written for was using an InfluxDB server on a
-different network than the clients. If the connection goes down,
-or the server is unreachable, the client has to handle the error and
-buffer datapoints.
+The usecase this was written to improve reliability of InfluxDB,
+especially when the InfluxDB server is on a different network than the
+clients. If the connection goes down, or the server is unreachable,
+the client has to handle the error and buffer datapoints.
 
 The purpose of `zflux` is to sit on the same network as the hosts producing
 the data sent to InfluxDB and act as the InfluxDB client. It recieves the
@@ -17,11 +17,11 @@ the server is responsive again.
 
 It supports both using `connect()` and `bind()`, but if both are defined it will default to using `connect()`.
 
-## Configure and run
+## Configuring
 
 The program looks for a config file in the following order
 
-1. A full file path defined in the `ZFLUX_CONF` environment variable
+1. A full file path defined in the `$ZFLUX_CONF` environment variable
 2. in `$HOME/.zflux.yml`
 3. in `/usr/local/etc/zflux.yml`
 4. in `/etc/zlufx.yml`
