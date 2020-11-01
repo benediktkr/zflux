@@ -90,6 +90,13 @@ class Zflux(object):
                     self.handle_buffer()
 
         except KeyboardInterrupt:
+            if len(self.buffer) > 0:
+                logger.info(f"nonempty buffer {len(self.buffer)}, flushing")
+                try:
+                    self.send_vuffer()
+                except Exception as e:
+                    logger.error(e)
+
             logger.info("exiting")
             raise SystemExit
 
@@ -109,6 +116,9 @@ class Zflux(object):
         now = time()
         count = len(self.buffer)
         if (now > self.influx_at + self.max_age) or (count > self.batch):
+            self.send_buffer()
+
+    def send_buffer(self):
             try:
                 while len(self.buffer) > 0:
                     thisbatch = list(islice(self.buffer, self.batch))
