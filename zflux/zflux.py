@@ -13,7 +13,7 @@ from influxdb import InfluxDBClient
 # exceptions influxdb throws
 from socket import gaierror
 from requests.exceptions import RequestException
-from influxdb.exceptions import InfluxDBServerError
+from influxdb.exceptions import InfluxDBServerError, InfluxDBClientError
 
 class Zflux(object):
 
@@ -132,17 +132,21 @@ class Zflux(object):
                     for _ in range(len(thisbatch)):
                         self.buffer.popleft()
             except (gaierror, RequestException, ValueError) as e:
-                if e.args[0].startswith("simulating"):
-                    logger.debug(e)
-                else:
-                    logger.error(e)
-                return 0
+                logger.error(e)
+                logger.info(f"messages in buffer: {len(self.buffer)}")
             except InfluxDBServerError as e:
                 if e.args[0]['error'] == 'timeout':
                     # influxdb.exceptions.InfluxDBServerError: {"error":"timeout"}
                     logger.error(e)
                 else:
-                    raise e
+                    raise
+            except InfluxDBClientError as e:
+                logger.error(e)
+                # exiting since we won't try to recover from influxdb client
+                # errors
+                raise SystemExit(e)
+
+
 
 def main():
 
