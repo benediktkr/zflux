@@ -89,8 +89,9 @@ class Config:
                 if e.errno == 2: continue
                 else: raise
         else:
-            logger.error(f"Config file 'zflux.yml' not found anywhere")
-            sys.exit(1)
+            logger.error("config file not found")
+            raise SystemExit("Config file not found")
+
 
     def as_dict(self):
         return vars(**self)
