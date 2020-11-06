@@ -1,4 +1,5 @@
 *.yml
+!test-zflux-local.yml
 nunittest.log
 tests/__pycache__
 zflux/__pycache__

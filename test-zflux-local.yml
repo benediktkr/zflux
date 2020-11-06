@@ -1,0 +1,15 @@
+---
+
+zmq:
+  topic: 'test'
+  bind: 'tcp://127.0.0.1:5006'
+  pub: 'tcp://127.0.0.1:5006'
+
+  #bind: 'inproc://pytest'
+  #pub: 'inproc://pytest'
+
+influxdb:
+  host: 128.66.0.1
+  db: test
+  user: test
+  passwd: 'test'
