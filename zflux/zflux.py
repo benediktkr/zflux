@@ -52,9 +52,12 @@ class Zflux(object):
     def connect(self, addr):
         self.addr = addr
         self.socket.connect(addr)
+        logger.info(f"connected to {addr}")
 
     def bind(self, addr):
+        logger.info(f"binding to {addr}")
         self.socket.bind(addr)
+
 
     def influxdb_setup(self, host, db, user, passwd, timeout=5, precision='m'):
         self.influxdb_client = InfluxDBClient(
@@ -93,7 +96,7 @@ class Zflux(object):
             if len(self.buffer) > 0:
                 logger.info(f"nonempty buffer {len(self.buffer)}, flushing")
                 try:
-                    self.send_vuffer()
+                    self.send_buffer()
                 except Exception as e:
                     logger.error(e)
 
@@ -142,13 +145,15 @@ class Zflux(object):
                     raise e
 
 def main():
-    logger.info("started")
 
     import zflux.config
     conf = zflux.config.Config.read()
 
     zflux = Zflux(conf.zmq.topic)
-    zflux.connect(conf.zmq.connect)
+    if conf.zmq.connect:
+        zflux.connect(conf.zmq.connect)
+    else:
+        zflux.bind(conf.zmq.bind)
     zflux.influxdb_setup(**vars(conf.influxdb))
 
     zflux.run()
