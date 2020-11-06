@@ -69,7 +69,7 @@ class Zflux(object):
             database=db,
             username=user,
             password=passwd)
-        self.influxdb_precision = precision
+        self.precision = precision
 
     def influxdb_write(self, msgs):
 
@@ -78,7 +78,7 @@ class Zflux(object):
 
         write = self.influxdb_client.write_points(
             msgs,
-            time_precision=self.preicision,
+            time_precision=self.precision,
             batch_size=self.batch)
         if not write:
             raise ValueError("influxdb client write returned False")
