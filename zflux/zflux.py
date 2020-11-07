@@ -100,6 +100,7 @@ class Zflux(object):
         except KeyboardInterrupt:
             if len(self.buffer) > 0:
                 logger.info(f"nonempty buffer {len(self.buffer)}, flushing")
+                logger.debug(self.buffer[0])
                 try:
                     self.send_buffer()
                 except Exception as e:
@@ -126,35 +127,40 @@ class Zflux(object):
         count = len(self.buffer)
 
         if (now > self.influx_at ) or (count > self.batch):
-
             until_next = int(self.influx_at) - int(now)
+
+            # if self.influx_at is more than a max_age away, an error handler
+            # is asking us to wait
+            #
+            # idea: keep self.buffer_size and check if it is growing?
             if until_next <= self.max_age:
-                # if self.influx_at is more than a max_age away, an error handler
-                # is asking us to wait
                 self.send_buffer()
 
 
-    def send_buffer(self):
-            try:
-                while len(self.buffer) > 0:
-                    thisbatch = list(islice(self.buffer, self.batch))
-                    #thisbatch = self.buffer[:1]
-                    self.influxdb_write(thisbatch)
-                    self.influx_at = time() + self.max_age
 
-                    for _ in range(len(thisbatch)):
-                        self.buffer.popleft()
-            except (gaierror, RequestException, ValueError, InfluxDBServerError) as e:
-                #if isinstance(e, InfluxDBServerError) and e.args[0]['error'] == 'timeout':
-                #    # influxdb.exceptions.InfluxDBServerError: {"error":"timeout"}
-                logger.warning(exc_str(e))
-                logger.warning(f"buffer size: {len(self.buffer)}, wait: {self.max_age*3}s")
-                self.influx_at = time() + self.max_age*3
-            except InfluxDBClientError as e:
-                logger.error(exc_str(e))
-                # exiting since we won't try to recover from influxdb client
-                # errors
-                raise SystemExit(e)
+    def send_buffer(self):
+
+        try:
+            while len(self.buffer) > 0:
+                thisbatch = list(islice(self.buffer, self.batch))
+                #thisbatch = self.buffer[:1]
+                self.influxdb_write(thisbatch)
+                self.influx_at = time() + self.max_age
+
+                for _ in range(len(thisbatch)):
+                    self.buffer.popleft()
+
+        except (gaierror, RequestException, ValueError, InfluxDBServerError) as e:
+            #if isinstance(e, InfluxDBServerError) and e.args[0]['error'] == 'timeout':
+            #    # influxdb.exceptions.InfluxDBServerError: {"error":"timeout"}
+            logger.warning(exc_str(e))
+            logger.warning(f"buffer size: {len(self.buffer)}, wait: {self.max_age*3}s")
+            self.influx_at = time() + self.max_age*3
+        except InfluxDBClientError as e:
+            logger.error(exc_str(e))
+            # exiting since we won't try to recover from influxdb client
+            # errors
+            raise SystemExit(e)
 
 
 
