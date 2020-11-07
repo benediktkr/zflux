@@ -13,5 +13,5 @@ RUN pip install /zflux
 # since config.py doesnt do env vars as-is
 ENV ZFLUX_CONF "/etc/zflux.yml"
 
-EXPOSE 5559
+EXPOSE 5558
 ENTRYPOINT ["zflux"]
