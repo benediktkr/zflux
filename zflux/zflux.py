@@ -150,17 +150,19 @@ class Zflux(object):
                 for _ in range(len(thisbatch)):
                     self.buffer.popleft()
 
-        except (gaierror, RequestException, ValueError, InfluxDBServerError) as e:
+        except InfluxDBClientError as e:
+            # client errors are f.ex. invalid format or bad auth. those requeusts
+            # will not succeed by trying again so we bail (maybe improve later?)
+            logger.error(exc_str(e))
+            raise SystemExit(1)
+
+        except (InfluxDBServerError, gaierror, RequestException, ValueError) as e:
             #if isinstance(e, InfluxDBServerError) and e.args[0]['error'] == 'timeout':
             #    # influxdb.exceptions.InfluxDBServerError: {"error":"timeout"}
+            wait = self.max_age*3
             logger.warning(exc_str(e))
-            logger.warning(f"buffer size: {len(self.buffer)}, wait: {self.max_age*3}s")
-            self.influx_at = time() + self.max_age*3
-        except InfluxDBClientError as e:
-            logger.error(exc_str(e))
-            # exiting since we won't try to recover from influxdb client
-            # errors
-            raise SystemExit(e)
+            logger.warning(f"buffer size: {len(self.buffer)}, wait: {wait}s")
+            self.influx_at = time() + wait
 
 
 
