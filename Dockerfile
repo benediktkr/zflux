@@ -11,7 +11,7 @@ RUN pip install /zflux
 
 # idea is to override with bind mounts
 # since config.py doesnt do env vars as-is
-ENV ZFLUX_CONF "/zflux.yml"
+ENV ZFLUX_CONF "/etc/zflux.yml"
 
 EXPOSE 5559
 ENTRYPOINT ["zflux"]

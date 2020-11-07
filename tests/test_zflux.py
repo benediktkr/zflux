@@ -1,10 +1,12 @@
 import threading
 from time import sleep, time
+from socket import gaierror
 
 import random
 
 import zmq.error
 from requests.exceptions import RequestException
+from influxdb.exceptions import InfluxDBServerError, InfluxDBClientError
 from loguru import logger
 
 from zflux.zflux import Zflux
@@ -14,8 +16,9 @@ from tests.stresstester import StressTester
 logger.add("unittest.log")
 logger.info("-----")
 
-class StopTestingMe(Exception): pass
+EXCEPTIONS = [InfluxDBServerError, gaierror, RequestException, ValueError]
 
+class StopTestingMe(Exception): pass
 
 class Zflux2(Zflux):
     def __init__(self, topic, count, *args, **kwargs):
@@ -49,55 +52,58 @@ class Zflux2(Zflux):
                 temp_last = val
 
             if self.fake_influxdb_errors:
-                if random.randint(0, 1000) < 2:
+                if random.randint(0, 500) == 2:
                     err = f"simulating errors {self.last_i}/{self.count}"
-                    raise RequestException(err)
+
+                    exc = random.choice(EXCEPTIONS)
+                    raise exc(err)
 
 
 
         self.last_i = temp_last
         if self.last_i >= self.count:
+            logger.success(f"counted {self.last_i} messages, stopping")
             raise StopTestingMe
 
 
-    def influxdb_write2(self, msgs):
-        if len(msgs) > self.batch or len(msgs) == 0:
-            raise ValueError("just send one chunk")
 
-        last_val = self.last_i
-        if last_val is None:
-            next_ = msgs[0]['fields']['value']
-            if next_ != 0:
-                self.missed = next_
-                logger.warning(f"start: {self.missed}")
-            last_val = next_-1
+    # def influxdb_write2(self, msgs):
+    #     if len(msgs) > self.batch or len(msgs) == 0:
+    #         raise ValueError("just send one chunk")
 
-        for msg in msgs:
-            val = msg['fields']['value']
-            diff = val - last_val
+    #     last_val = self.last_i
+    #     if last_val is None:
+    #         next_ = msgs[0]['fields']['value']
+    #         if next_ != 0:
+    #             self.missed = next_
+    #             logger.warning(f"start: {self.missed}")
+    #         last_val = next_-1
 
-            assert val > last_val, f"new value sould be larger, {val}>{last_val}"
-            assert diff == 1, f"{diff} == 1, val: {val}, last_val: {last_val}"
+    #     for msg in msgs:
+    #         val = msg['fields']['value']
+    #         diff = val - last_val
 
-            # if diff == 0 and last_val == 0:
-            #     # starting from 0 is a speial case
-            #     pass
-            if self.fake_influxdb_errors:
-                if random.randint(0, 100) < random.randint(0, 10):
-                    raise RequestException("simulating errors")
+    #         assert val > last_val, f"new value sould be larger, {val}>{last_val}"
+    #         assert diff == 1, f"{diff} == 1, val: {val}, last_val: {last_val}"
 
-            # if val % 1000 == 0:
-            #     logger.info(f"{val}/{self.count}")
-            last_val = val
+    #         # if diff == 0 and last_val == 0:
+    #         #     # starting from 0 is a speial case
+    #         #     pass
+    #         if self.fake_influxdb_errors:
+    #             if random.randint(0, 100) < random.randint(0, 10):
+    #                 raise RequestException("simulating errors")
 
-        if last_val >= self.count:
-            logger.info(f"got {val}/{self.count} messags in order")
-            raise StopTestingMe
+    #         # if val % 1000 == 0:
+    #         #     logger.info(f"{val}/{self.count}")
+    #         last_val = val
 
-        self.last_i = last_val
+    #     if last_val >= self.count:
+    #         logger.info(f"got {val}/{self.count} messags in order")
+    #         raise StopTestingMe
 
-        return True
+    #     self.last_i = last_val
 
+    #     return True
 
 class Job(threading.Thread):
     def __init__(self, *args, **kwargs):
@@ -144,9 +150,9 @@ class ZfluxJob(Job):
         try:
             self.zflux.run()
         except StopTestingMe:
-
             return True
         except Exception:
+            # dont delete this
             raise
 
 class StressJob(Job):
@@ -195,21 +201,20 @@ class StressJob(Job):
 #     run_test_threads(conf, count, poll_secs=1.0)
 
 def test_counting_local():
-    conf = Config.read('test-zflux-local.yml')
     count = random.randint(3000, 5000)
 
-    run_test_threads(conf, count)
+    run_test_threads(count)
 
 def test_counting_local_noerrors():
-    conf = Config.read('test-zflux-local.yml')
     count = random.randint(3000, 5000)
 
-    run_test_threads(conf, count, fake_influxdb_errors=False)
+    run_test_threads(count, fake_influxdb_errors=False)
 
 
 
-def run_test_threads(conf, count, **kwargs):
-    zflux_thread = ZfluxJob(conf, count, **kwargs)
+def run_test_threads(count, **kwargs):
+    conf = Config.read('test-zflux-local.yml')
+    zflux_thread = ZfluxJob(conf, count, max_age=0, **kwargs)
     zflux_thread.start()
 
     sleep(2)
@@ -232,10 +237,7 @@ def test_zflux_version():
     assert __version__ == '0.1.0'
 
 if __name__ == "__main__":
-    from zflux.config import argparser
 
-    args = argparser().parse_args()
-    conf = Config.read(args.config)
     count = random.randint(3000, 5000)
 
-    run_test_threads(conf, count)
+    run_test_threads(count)

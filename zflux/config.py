@@ -40,7 +40,6 @@ class Config:
     name: str
     zmq: ZmqConfig
     influxdb: InfluxDBConfig
-    test: bool = False
 
     @classmethod
     def read(cls, path=None):
@@ -48,10 +47,10 @@ class Config:
         if not path:
             locations = [
                 os.environ.get("ZFLUX_CONF", ""),
+                os.path.join(os.curdir, "zflux.yml"),
                 os.path.join(os.path.expanduser("~"), ".zflux.yml"),
                 "/usr/local/etc/zflux.yml",
                 '/etc/zflux.yml',
-                os.path.join(os.curdir, "zflux.yml")
             ]
         else:
             if path.startswith("/"):
@@ -67,18 +66,14 @@ class Config:
                     yconfig = yaml.safe_load(cf)
                     zconf = yconfig['zmq']
                     inflconf = yconfig['influxdb']
-                    testconf = yconfig.get('test', False)
+
+                    logger.debug(f"using confg file {conffile}")
                 try:
-                    if not testconf:
-                        import sys
-                        logger.remove()
-                        logger.add(sys.stderr, backtrace=False, diagnose=False)
 
                     return cls(
                         name=conffile,
                         zmq=cls.ZmqConfig(**zconf),
                         influxdb=cls.InfluxDBConfig(**inflconf),
-                        test=False
                     )
                 except TypeError as e:
                     logger.exception(e)

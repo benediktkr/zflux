@@ -4,3 +4,4 @@ nunittest.log
 tests/__pycache__
 zflux/__pycache__
 *.log
+zflux.egg-info/

@@ -15,6 +15,9 @@ from socket import gaierror
 from requests.exceptions import RequestException
 from influxdb.exceptions import InfluxDBServerError, InfluxDBClientError
 
+def exc_str(exception):
+    return f"{type(exception).__name__}: {exception}"
+
 class Zflux(object):
 
     def __init__(self, topic, batch=4, max_age=5, poll_secs=10):
@@ -34,7 +37,7 @@ class Zflux(object):
         self.batch = batch
         self.max_age=max_age
 
-        self.influx_at = time()
+        self.influx_at = time() + self.max_age
         self.buffer = deque()
 
         # PUSH/PULL is round-robin
@@ -80,6 +83,7 @@ class Zflux(object):
             msgs,
             time_precision=self.precision,
             batch_size=self.batch)
+
         if not write:
             raise ValueError("influxdb client write returned False")
         return len(msgs)
@@ -91,6 +95,7 @@ class Zflux(object):
                 self.handle_recv()
                 if len(self.buffer) > 0:
                     self.handle_buffer()
+
 
         except KeyboardInterrupt:
             if len(self.buffer) > 0:
@@ -111,6 +116,7 @@ class Zflux(object):
             topic, msg = self.socket.recv_multipart()
             # topic is not used but very probably will be
             jmsg = json.loads(msg.decode())
+            #logger.debug(jmsg)
 
             self.buffer.append(jmsg)
 
@@ -118,8 +124,15 @@ class Zflux(object):
 
         now = time()
         count = len(self.buffer)
-        if (now > self.influx_at + self.max_age) or (count > self.batch):
-            self.send_buffer()
+
+        if (now > self.influx_at ) or (count > self.batch):
+
+            until_next = int(self.influx_at) - int(now)
+            if until_next <= self.max_age:
+                # if self.influx_at is more than a max_age away, an error handler
+                # is asking us to wait
+                self.send_buffer()
+
 
     def send_buffer(self):
             try:
@@ -127,21 +140,18 @@ class Zflux(object):
                     thisbatch = list(islice(self.buffer, self.batch))
                     #thisbatch = self.buffer[:1]
                     self.influxdb_write(thisbatch)
-                    self.influx_at = time()
+                    self.influx_at = time() + self.max_age
 
                     for _ in range(len(thisbatch)):
                         self.buffer.popleft()
-            except (gaierror, RequestException, ValueError) as e:
-                logger.error(e)
-                logger.info(f"messages in buffer: {len(self.buffer)}")
-            except InfluxDBServerError as e:
-                if e.args[0]['error'] == 'timeout':
-                    # influxdb.exceptions.InfluxDBServerError: {"error":"timeout"}
-                    logger.error(e)
-                else:
-                    raise
+            except (gaierror, RequestException, ValueError, InfluxDBServerError) as e:
+                #if isinstance(e, InfluxDBServerError) and e.args[0]['error'] == 'timeout':
+                #    # influxdb.exceptions.InfluxDBServerError: {"error":"timeout"}
+                logger.warning(exc_str(e))
+                logger.warning(f"buffer size: {len(self.buffer)}, wait: {self.max_age*3}s")
+                self.influx_at = time() + self.max_age*3
             except InfluxDBClientError as e:
-                logger.error(e)
+                logger.error(exc_str(e))
                 # exiting since we won't try to recover from influxdb client
                 # errors
                 raise SystemExit(e)
