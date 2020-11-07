@@ -9,6 +9,16 @@ import yaml
 
 from loguru import logger
 
+def logger_from_env():
+    if 'ZFLUX_LOGFILE' in os.environ:
+        logfile = os.environ["ZFLUX_LOGFILE"]
+        loglevel = os.environ.get("ZFLUX_LOGLEVEL", "DEBUG")
+        logger.remove()
+        logger.add(sys.stderr, level=loglevel)
+        logger.add(logfile, level=loglevel)
+        logger.debug("configured logger for env vars")
+
+
 @dataclass
 class Config:
 
@@ -43,6 +53,7 @@ class Config:
 
     @classmethod
     def read(cls, path=None):
+        logger_from_env()
 
         if not path:
             locations = [
