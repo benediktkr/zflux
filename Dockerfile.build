@@ -1,13 +1,19 @@
 FROM benediktkr/poetry:latest
 MAINTAINER Benedikt Kristinsson <benedikt@lokun.is>
-RUN mkdir /zflux
 
-COPY zflux/ /zflux/zflux/
-COPY tests/ /zlux/tests/
-COPY pyproject.toml /zflux/pyproject.toml
-COPY poetry.lock /zflux/poetry.lock
 
-WORKDIR /zflux
+RUN mkdir /app
+WORKDIR /app
+
+#RUN apt-get update && apt-get install -y libczmq-dev libczmq
+
+#RUN poetry config virtualenvs.create true
+
+COPY poetry.lock pyproject.toml /app/
+RUN poetry install --no-dev
 
 ENTRYPOINT ["poetry"]
-CMD ["build", "-f", "sdist"]
+CMD ["build"]
+
+
+# check this: https://jenkins.sudo.is/job/zflux/16/console
