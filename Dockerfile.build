@@ -1,0 +1,13 @@
+FROM benediktkr/poetry:latest
+MAINTAINER Benedikt Kristinsson <benedikt@lokun.is>
+RUN mkdir /zflux
+
+COPY zflux/ /zflux/zflux/
+COPY tests/ /zlux/tests/
+COPY pyproject.toml /zflux/pyproject.toml
+COPY poetry.lock /zflux/poetry.lock
+
+WORKDIR /zflux
+
+ENTRYPOINT ["poetry"]
+CMD ["build", "-f", "sdist"]
