@@ -1,26 +1,23 @@
 [tool.poetry]
 name = "zflux"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["Benedikt Kristinsson <benedikt@lokun.is>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-zmq = "^0.0.0"
 influxdb = "^5.3.0"
 loguru = "^0.5.3"
 requests = "^2.24.0"
 pyyaml = "^5.3.1"
+pyzmq = "^19.0.2"
 
 [tool.poetry.scripts]
 zflux = "zflux.zflux:main"
 
-
-
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
 loguru = "^0.5.3"
-zmq = "^0.0.0"
 requests = "^2.24.0"
 
 [build-system]

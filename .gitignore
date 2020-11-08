@@ -6,3 +6,4 @@ zflux/__pycache__
 *.log
 zflux.egg-info/
 dist/
+zflux*.tar.gz
