@@ -1,6 +1,8 @@
 FROM python:3.8
 MAINTAINER Benedikt Kristinsson <benedikt@lokun.is>
 
+RUN useradd -u 1211 -ms /bin/bash zflux
+
 RUN mkdir /zflux
 COPY zflux/ /zflux/zflux/
 COPY tests/ /zlux/tests/
@@ -14,4 +16,5 @@ RUN pip install /zflux
 ENV ZFLUX_CONF "/etc/zflux.yml"
 
 EXPOSE 5558
+USER 1211
 ENTRYPOINT ["zflux"]
