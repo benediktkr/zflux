@@ -61,7 +61,7 @@ class Config:
                 os.path.join(os.curdir, "zflux.yml"),
                 os.path.join(os.path.expanduser("~"), ".zflux.yml"),
                 "/usr/local/etc/zflux.yml",
-                '/etc/zflux.yml',
+                "/etc/zflux.yml",
             ]
         else:
             if path.startswith("/"):

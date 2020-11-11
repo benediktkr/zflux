@@ -1,5 +1,7 @@
 # zflux
 
+![build status](https://jenkins.sudo.is/buildStatus/icon?job=zflux&style=flat-square)
+
 A buffering proxy for InfluxDB, using a zmq SUB socket.
 
 ## Overview
@@ -23,10 +25,11 @@ It supports both using `connect()` and `bind()`, but if both are defined it will
 The program looks for a config file in the following order
 
 1. A full file path defined in the `$ZFLUX_CONF` environment variable
-2. in `$HOME/.zflux.yml`
-3. in `/usr/local/etc/zflux.yml`
-4. in `/etc/zlufx.yml`
-5. in `$(pwd)/zflux.yml`
+2. in `$(pwd)/zflux.yml`
+3. in `$HOME/.zflux.yml`
+4. in `/usr/local/etc/zflux.yml`
+5. in `/etc/zlufx.yml`
+
 
 ### Sample config
 
