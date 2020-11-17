@@ -49,7 +49,7 @@ class Config:
 
     name: str
     zmq: ZmqConfig
-    influxdb: InfluxDBConfig
+    influxdb: [InfluxDBConfig]
 
     @classmethod
     def read(cls, path=None):
@@ -76,15 +76,16 @@ class Config:
                 with open(conffile, 'r') as cf:
                     yconfig = yaml.safe_load(cf)
                     zconf = yconfig['zmq']
-                    inflconf = yconfig['influxdb']
+                    inflconfs = yconfig['influxdb']
 
                     logger.debug(f"using confg file {conffile}")
                 try:
 
+                    influxdb = [cls.InfluxDBConfig(**i) for i in inflconfs]
                     return cls(
                         name=conffile,
                         zmq=cls.ZmqConfig(**zconf),
-                        influxdb=cls.InfluxDBConfig(**inflconf),
+                        influxdb=influxdb,
                     )
                 except TypeError as e:
                     logger.exception(e)

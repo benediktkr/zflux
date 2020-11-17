@@ -9,7 +9,7 @@ zmq:
   #pub: 'inproc://pytest'
 
 influxdb:
-  host: 128.66.0.1
-  db: test
-  user: test
-  passwd: 'test'
+  - host: 128.66.0.1
+    db: test
+    user: test
+    passwod: 'test'

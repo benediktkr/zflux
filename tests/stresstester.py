@@ -32,7 +32,7 @@ class StressTester(object):
         logger.debug("closed socket and destroyed context")
 
     def mkmsg(self, value):
-        return {'fields': {'value': value}}
+        #return {'fields': {'value': value}}
         return {"tags": {"test": "yes"},
                 "fields": {"value": value },
                 "measurement": "rand",
