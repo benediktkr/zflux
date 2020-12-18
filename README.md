@@ -1,6 +1,6 @@
 # zflux
 
-![build status](https://jenkins.sudo.is/buildStatus/icon?job=zflux&style=flat-square)
+![build status](https://jenkins.sudo.is/buildStatus/icon?job=projects%2Fzflux&style=flat-square)
 
 A buffering proxy for InfluxDB, using a zmq SUB socket.
 
