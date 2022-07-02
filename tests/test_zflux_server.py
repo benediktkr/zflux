@@ -74,8 +74,9 @@ def test_ruok(resource):
 
 def test_metrics(resource):
     metrics = get_metrics(resource.metrics_addr)
-    assert 'buffer' in metrics
-    assert metrics['buffer'] == 0
+    assert 'buffer_size' in metrics
+    assert metrics['buffer_size'] == 0
+    assert 'influx_at' in metrics
 
 
 def test_random_msgs(resource):

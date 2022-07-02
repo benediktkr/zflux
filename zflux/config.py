@@ -16,7 +16,6 @@ def logger_from_env():
         logger.remove()
         logger.add(sys.stderr, level=loglevel)
         logger.add(logfile, level=loglevel)
-        logger.debug("configured logger for env vars")
 
 
 @dataclass
@@ -79,7 +78,6 @@ class Config:
                     zconf = yconfig['zmq']
                     inflconf = yconfig['influxdb']
 
-                    logger.debug(f"using confg file {conffile}")
                 try:
 
                     return cls(

@@ -14,7 +14,7 @@ from zflux.config import Config
 @contextmanager
 def zmq_metrics(metrics_addr, metric_name):
 
-    timeout = 1000
+    timeout = 10000
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
     socket.connect(metrics_addr)

@@ -20,7 +20,7 @@ def exc_str(exception):
 
 class Zflux(object):
 
-    def __init__(self, topic, batch=4, max_age=5, poll_secs=10):
+    def __init__(self, topic, batch=4, max_age=5, poll_secs=2):
         """
         influxdb_client: InfluxDBClient object
         batch: how many messages to send to influxdb at a time
@@ -87,7 +87,7 @@ class Zflux(object):
 
 
 
-    def influxdb_setup(self, host, db, user, passwd, timeout=5, precision='m'):
+    def influxdb_setup(self, host, db, user, passwd, timeout=2, precision='m'):
         self.influxdb_client = InfluxDBClient(
             host=host,
             port=443,
@@ -136,6 +136,14 @@ class Zflux(object):
     def handle_recv(self):
         polled = dict(self.poller.poll(timeout=self.poll_secs*1000))
 
+        if self.metrics in polled and polled[self.metrics] == zmq.POLLIN:
+            msg = self.metrics.recv()
+            if msg == b"ruok":
+                self.metrics.send(b'imok')
+            elif msg == b"metrics":
+                metrics = {'buffer_size': len(self.buffer), 'influx_at': self.influx_at}
+                self.metrics.send(json.dumps(metrics).encode())
+
         if self.socket in polled and polled[self.socket] == zmq.POLLIN:
             topic, msg = self.socket.recv_multipart()
             # topic is not used but very probably will be
@@ -144,13 +152,6 @@ class Zflux(object):
 
             self.buffer.append(jmsg)
 
-        if self.metrics in polled and polled[self.metrics] == zmq.POLLIN:
-            msg = self.metrics.recv()
-            if msg == b"ruok":
-                self.metrics.send(b'imok')
-            elif msg == b"metrics":
-                metrics = {'buffer': len(self.buffer)}
-                self.metrics.send(json.dumps(metrics).encode())
 
     def handle_buffer(self):
 

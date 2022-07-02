@@ -1,6 +1,6 @@
 # zflux
 
-![build status](https://jenkins.sudo.is/buildStatus/icon?job=projects%2Fzflux&style=flat-square)
+[![build status](https://jenkins.sudo.is/buildStatus/icon?job=ben%2Fzflux%2Fmain&style=flat-square)](https://jenkins.sudo.is/job/ben/job/zflux/job/main/)
 
 A buffering proxy for InfluxDB, using a zmq SUB socket.
 
@@ -41,6 +41,7 @@ zmq:
   connect: 'tcp://$zmq_proxy:5560'
   # alternatively you can use bind()
   #bind: 'tcp://*:5559'
+
 
 influxdb:
   host: influxdb.example.com
