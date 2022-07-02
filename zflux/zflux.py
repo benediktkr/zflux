@@ -45,33 +45,46 @@ class Zflux(object):
         self.socket = self.context.socket(zmq.SUB)
         self.socket.setsockopt(zmq.SUBSCRIBE, self.topic)
 
-        # healthcecks
+        # healthcecks and healtchecks
         self.metrics = self.context.socket(zmq.REP)
 
         self.poller = zmq.Poller()
         self.poller.register(self.socket, zmq.POLLIN)
-        self.poller.register(self.metrics, zmq.POLLIN)
 
     def __del__(self):
         self.close()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        return self.close()
+
     def close(self):
         logger.info("closing sockets and exiting")
         self.socket.close()
-        self.context.destroy()
+        self.metrics.close()
+        self.context.term()
 
     def connect(self, addr):
-        self.addr = addr
         self.socket.connect(addr)
+
         logger.info(f"connected to: {addr}")
+        self.connect_addr = addr
+
+    def listen_metrics(self, addr):
+        self.metrics.bind(addr)
+        self.poller.register(self.metrics, zmq.POLLIN)
+
+        logger.info(f"metrics: {addr}")
+        self.metrics_addr = addr
 
     def bind(self, addr, metrics=None):
-        logger.info(f"bind:  {addr}")
         self.socket.bind(addr)
 
-        if metrics is not None:
-            logger.info(f"metrics: {metrics}")
-            self.metrics.bind(metrics)
+        logger.info(f"bind: {addr}")
+        self.bind_addr = addr
+
 
 
     def influxdb_setup(self, host, db, user, passwd, timeout=5, precision='m'):
@@ -154,8 +167,6 @@ class Zflux(object):
             if until_next <= self.max_age:
                 self.send_buffer()
 
-
-
     def send_buffer(self):
 
         try:
@@ -193,7 +204,11 @@ def main():
     if conf.zmq.connect:
         zflux.connect(conf.zmq.connect)
     else:
-        zflux.bind(conf.zmq.bind, conf.zmq.metrics)
+        zflux.bind(conf.zmq.bind)
+
+    if conf.zmq.metrics is not None:
+        zflux.listen_metrics(conf.zmq.metrics)
+
     zflux.influxdb_setup(**vars(conf.influxdb))
 
     zflux.run()
