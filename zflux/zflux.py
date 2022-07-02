@@ -45,21 +45,33 @@ class Zflux(object):
         self.socket = self.context.socket(zmq.SUB)
         self.socket.setsockopt(zmq.SUBSCRIBE, self.topic)
 
+        # healthcecks
+        self.metrics = self.context.socket(zmq.REP)
+
         self.poller = zmq.Poller()
         self.poller.register(self.socket, zmq.POLLIN)
+        self.poller.register(self.metrics, zmq.POLLIN)
 
     def __del__(self):
+        self.close()
+
+    def close(self):
+        logger.info("closing sockets and exiting")
         self.socket.close()
         self.context.destroy()
 
     def connect(self, addr):
         self.addr = addr
         self.socket.connect(addr)
-        logger.info(f"connected to {addr}")
+        logger.info(f"connected to: {addr}")
 
-    def bind(self, addr):
-        logger.info(f"binding to {addr}")
+    def bind(self, addr, metrics=None):
+        logger.info(f"bind:  {addr}")
         self.socket.bind(addr)
+
+        if metrics is not None:
+            logger.info(f"metrics: {metrics}")
+            self.metrics.bind(metrics)
 
 
     def influxdb_setup(self, host, db, user, passwd, timeout=5, precision='m'):
@@ -106,9 +118,7 @@ class Zflux(object):
                 except Exception as e:
                     logger.error(e)
 
-            logger.info("exiting")
             raise SystemExit
-
 
     def handle_recv(self):
         polled = dict(self.poller.poll(timeout=self.poll_secs*1000))
@@ -120,6 +130,14 @@ class Zflux(object):
             #logger.debug(jmsg)
 
             self.buffer.append(jmsg)
+
+        if self.metrics in polled and polled[self.metrics] == zmq.POLLIN:
+            msg = self.metrics.recv()
+            if msg == b"ruok":
+                self.metrics.send(b'imok')
+            elif msg == b"metrics":
+                metrics = {'buffer': len(self.buffer)}
+                self.metrics.send(json.dumps(metrics).encode())
 
     def handle_buffer(self):
 
@@ -175,7 +193,7 @@ def main():
     if conf.zmq.connect:
         zflux.connect(conf.zmq.connect)
     else:
-        zflux.bind(conf.zmq.bind)
+        zflux.bind(conf.zmq.bind, conf.zmq.metrics)
     zflux.influxdb_setup(**vars(conf.influxdb))
 
     zflux.run()

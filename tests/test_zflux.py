@@ -1,6 +1,7 @@
 import threading
 from time import sleep, time
 from socket import gaierror
+import os
 
 import random
 
@@ -11,10 +12,12 @@ from loguru import logger
 
 from zflux.zflux import Zflux
 from zflux.config import Config
+from zflux.metricscli import get_ruok
 from tests.stresstester import StressTester
 
-logger.add("unittest.log")
-logger.info("-----")
+if 'LOGFILE' in os.environ:
+    logger.add("unittest.log")
+    logger.info("-----")
 
 EXCEPTIONS = [InfluxDBServerError, gaierror, RequestException, ValueError]
 
@@ -211,13 +214,13 @@ def test_counting_local_noerrors():
     run_test_threads(count, fake_influxdb_errors=False)
 
 
-
 def run_test_threads(count, **kwargs):
     conf = Config.read('test-zflux-local.yml')
     zflux_thread = ZfluxJob(conf, count, max_age=0, **kwargs)
     zflux_thread.start()
 
     sleep(2)
+    #assert get_ruok(conf.zmq.metrics) == b"imok"
 
     stress_thread = StressJob(conf, count)
     stress_thread.start()

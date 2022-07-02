@@ -28,6 +28,7 @@ class Config:
         bind: str = None
         connect: str = None
         pub: str = None
+        metrics: str = None
 
         def __post_init__(self):
 
@@ -87,7 +88,7 @@ class Config:
                         influxdb=cls.InfluxDBConfig(**inflconf),
                     )
                 except TypeError as e:
-                    logger.exception(e)
+                    logger.error(e)
                     raise
 
 
