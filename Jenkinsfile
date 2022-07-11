@@ -1,3 +1,3 @@
 @Library('shared-jenkins-pipelines') _
 
-dockerimg tag: 'latest', dockreg: 'dockreg.sudo.is'
+dockerimg tag: 'latest', dockreg: 'git.sudo.is/ben'
